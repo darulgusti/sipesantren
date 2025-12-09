@@ -16,6 +16,11 @@ import 'package:sipesantren/features/master_data/presentation/mapel_list_page.da
 import 'package:sipesantren/features/santri/presentation/santri_form_page.dart';
 import 'package:sipesantren/features/master_data/presentation/weight_config_page.dart';
 
+import 'package:sipesantren/core/services/grading_service.dart';
+import 'package:sipesantren/core/repositories/weight_config_repository.dart';
+import 'package:sipesantren/core/models/weight_config_model.dart'; // Added
+import 'package:intl/intl.dart';
+
 class SantriListPage extends ConsumerStatefulWidget {
   const SantriListPage({super.key});
 
@@ -446,248 +451,1365 @@ class _SantriListPageState extends ConsumerState<SantriListPage> with SingleTick
 }
 
 class SantriDetailPage extends ConsumerStatefulWidget {
+
   final SantriModel santri;
+
+
 
   const SantriDetailPage({super.key, required this.santri});
 
+
+
   @override
+
   ConsumerState<SantriDetailPage> createState() => _SantriDetailPageState();
+
 }
 
+
+
 class _SantriDetailPageState extends ConsumerState<SantriDetailPage> {
-  List<PenilaianTahfidz> _tahfidzData = [];
+
+  final GradingService _gradingService = GradingService();
+
+  
+
   bool _isLoading = true;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadTahfidzData();
-  }
+  
 
-  Future<void> _loadTahfidzData() async {
-    final _penilaianRepository = ref.read(penilaianRepositoryProvider);
-    final data = await _penilaianRepository.getTahfidzBySantri(widget.santri.id);
-    if (mounted) {
-      setState(() {
-        _tahfidzData = data;
-        _isLoading = false;
-      });
+    // Data State
+
+  
+
+    List<PenilaianTahfidz> _tahfidzData = [];
+
+  
+
+    List<Kehadiran> _kehadiranData = [];
+
+  
+
+    
+
+  
+
+    // Calculated Scores
+
+  
+
+    Map<String, double> _scores = {
+
+  
+
+      'Tahfidz': 0,
+
+  
+
+  
+
+    'Fiqh': 0,
+
+    'Bahasa Arab': 0,
+
+    'Akhlak': 0,
+
+    'Kehadiran': 0,
+
+  };
+
+  
+
+    Map<String, dynamic> _finalGrade = {
+
+  
+
+      'score': 0.0,
+
+  
+
+      'predikat': '-',
+
+  
+
+    };
+
+  
+
+  
+
+  
+
+    // State for calculation breakdown
+
+  
+
+    WeightConfigModel? _weights;
+
+  
+
+    bool _showCalculationDetails = false;
+
+  
+
+  
+
+  
+
+    // Calendar State
+
+  
+
+    DateTime _focusedMonth = DateTime.now();
+
+  
+
+  
+
+  
+
+    @override
+
+  
+
+    void initState() {
+
+  
+
+      super.initState();
+
+  
+
+      _loadAllData();
+
+  
+
     }
-  }
+
+  
+
+  
+
+  
+
+    Future<void> _loadAllData() async {
+
+  
+
+      final santriId = widget.santri.id;
+
+  
+
+      final penilaianRepo = ref.read(penilaianRepositoryProvider);
+
+  
+
+      final weightRepo = ref.read(weightConfigRepositoryProvider);
+
+  
+
+  
+
+  
+
+      try {
+
+  
+
+        // 1. Ensure weights are ready
+
+  
+
+        await weightRepo.initializeWeightConfig();
+
+  
+
+        final weights = await weightRepo.getWeightConfig().first;
+
+  
+
+  
+
+  
+
+        // 2. Fetch all raw data
+
+  
+
+        final tahfidz = await penilaianRepo.getTahfidzBySantri(santriId);
+
+  
+
+        final mapel = await penilaianRepo.getMapelBySantri(santriId);
+
+  
+
+        final akhlak = await penilaianRepo.getAkhlakBySantri(santriId);
+
+  
+
+        final kehadiran = await penilaianRepo.getKehadiranBySantri(santriId);
+
+  
+
+  
+
+  
+
+        // 3. Calculate Scores
+
+  
+
+        final sTahfidz = _gradingService.calculateTahfidz(tahfidz);
+
+  
+
+        final sFiqh = _gradingService.calculateMapel(mapel, 'Fiqh');
+
+  
+
+        final sArab = _gradingService.calculateMapel(mapel, 'Bahasa Arab');
+
+  
+
+        final sAkhlak = _gradingService.calculateAkhlak(akhlak);
+
+  
+
+        final sKehadiran = _gradingService.calculateKehadiran(kehadiran);
+
+  
+
+  
+
+  
+
+        final finalResult = _gradingService.calculateFinalGrade(
+
+  
+
+          tahfidz: sTahfidz,
+
+  
+
+          fiqh: sFiqh,
+
+  
+
+          bahasaArab: sArab,
+
+  
+
+          akhlak: sAkhlak,
+
+  
+
+          kehadiran: sKehadiran,
+
+  
+
+          weights: weights,
+
+  
+
+        );
+
+  
+
+  
+
+  
+
+        if (mounted) {
+
+  
+
+          setState(() {
+
+  
+
+            _tahfidzData = tahfidz;
+
+  
+
+            _kehadiranData = kehadiran;
+
+  
+
+            
+
+  
+
+            _scores = {
+
+  
+
+              'Tahfidz': sTahfidz,
+
+  
+
+              'Fiqh': sFiqh,
+
+  
+
+              'Bahasa Arab': sArab,
+
+  
+
+              'Akhlak': sAkhlak,
+
+  
+
+              'Kehadiran': sKehadiran,
+
+  
+
+            };
+
+  
+
+            
+
+  
+
+            _finalGrade = finalResult;
+
+  
+
+            _weights = weights; // Save weights
+
+  
+
+            _isLoading = false;
+
+  
+
+          });
+
+  
+
+        }
+
+  
+
+      } catch (e) {
+
+  
+
+        debugPrint('Error loading detailed data: $e');
+
+  
+
+        if (mounted) {
+
+  
+
+          setState(() => _isLoading = false);
+
+  
+
+        }
+
+  
+
+      }
+
+  
+
+    }
+
+  
+
+  
+
+
 
   @override
+
   Widget build(BuildContext context) {
+
+    final userRole = ref.watch(userProvider).userRole;
+
+    final isWali = userRole == 'Wali' || userRole == 'Wali Santri';
+
+
+
     return DefaultTabController(
+
       length: 4,
+
       child: Scaffold(
+
         appBar: AppBar(
+
           title: Text(widget.santri.nama),
+
           bottom: const TabBar(
+
             tabs: [
+
               Tab(text: 'Penilaian'),
+
               Tab(text: 'Kehadiran'),
+
               Tab(text: 'Grafik'),
+
               Tab(text: 'Rapor'),
+
             ],
+
           ),
+
         ),
-        body: TabBarView(
-          children: [
-            // Tab Penilaian
-            SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  _buildNilaiCard('Tahfidz', '93', Colors.green, Icons.book),
-                  _buildNilaiCard('Fiqh', '86', Colors.blue, Icons.balance),
-                  _buildNilaiCard('Bahasa Arab', '78', Colors.orange, Icons.language),
-                  _buildNilaiCard('Akhlak', '94', Colors.purple, Icons.emoji_people),
-                  _buildNilaiCard('Kehadiran', '90', Colors.red, Icons.calendar_today),
-                  const SizedBox(height: 16),
-                  if (ref.watch(userProvider).userRole != 'Wali' && ref.watch(userProvider).userRole != 'Wali Santri')
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => InputPenilaianPage(santri: widget.santri),
-                          ),
-                        );
-                        _loadTahfidzData();
-                      },
-                      icon: const Icon(Icons.add),
-                      label: const Text('Input Penilaian Baru'),
+
+        body: _isLoading 
+
+          ? const Center(child: CircularProgressIndicator())
+
+          : TabBarView(
+
+            children: [
+
+              _buildTabPenilaian(),
+
+              _buildTabKehadiran(),
+
+              _buildTabGrafik(),
+
+              _buildTabRaporSummary(),
+
+            ],
+
+          ),
+
+        floatingActionButton: !isWali
+
+            ? FloatingActionButton.extended(
+
+                onPressed: () async {
+
+                  await Navigator.push(
+
+                    context,
+
+                    MaterialPageRoute(
+
+                      builder: (context) => InputPenilaianPage(santri: widget.santri),
+
                     ),
-                ],
-              ),
-            ),
 
-            // Tab Kehadiran
-            const Center(child: Text('Data Kehadiran akan ditampilkan di sini')),
+                  );
 
-            // Tab Grafik
-            _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _buildTahfidzChart(),
+                  _loadAllData(); // Refresh on return
 
-            // Tab Rapor
-            SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          const Text(
-                            'RAPOR SANTRI',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 16),
-                          _buildRaporItem('Nilai Akhir', '89'),
-                          _buildRaporItem('Predikat', 'A'),
-                          _buildRaporItem('Peringkat', '5 dari 40'),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => RaporPage(santri: widget.santri),
-                                ),
-                              );
-                            },
-                            child: const Text('Lihat Rapor Lengkap'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+                },
+
+                icon: const Icon(Icons.add),
+
+                label: const Text('Nilai Baru'),
+
+                backgroundColor: Theme.of(context).colorScheme.primary,
+
+                foregroundColor: Colors.white,
+
+              )
+
+            : null,
+
       ),
+
     );
+
   }
+
+
+
+  // --- TAB 1: Penilaian ---
+
+  Widget _buildTabPenilaian() {
+
+    return SingleChildScrollView(
+
+      padding: const EdgeInsets.all(16),
+
+      child: Column(
+
+        children: [
+
+          _buildNilaiCard('Tahfidz', _scores['Tahfidz']!.toStringAsFixed(0), Colors.green, Icons.book),
+
+          _buildNilaiCard('Fiqh', _scores['Fiqh']!.toStringAsFixed(0), Colors.blue, Icons.balance),
+
+          _buildNilaiCard('Bahasa Arab', _scores['Bahasa Arab']!.toStringAsFixed(0), Colors.orange, Icons.language),
+
+          _buildNilaiCard('Akhlak', _scores['Akhlak']!.toStringAsFixed(0), Colors.purple, Icons.emoji_people),
+
+          _buildNilaiCard('Kehadiran', _scores['Kehadiran']!.toStringAsFixed(0), Colors.red, Icons.calendar_today),
+
+          
+
+          const SizedBox(height: 24),
+
+          const Divider(),
+
+          const SizedBox(height: 16),
+
+          
+
+                    // Final Score Display
+
+          
+
+                    Container(
+
+          
+
+                      padding: const EdgeInsets.all(20),
+
+          
+
+                      decoration: BoxDecoration(
+
+          
+
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+
+          
+
+                        borderRadius: BorderRadius.circular(20),
+
+          
+
+                        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+
+          
+
+                      ),
+
+          
+
+                      child: Column(
+
+          
+
+          
+
+              children: [
+
+                const Text('ESTIMASI NILAI AKHIR', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+
+                const SizedBox(height: 10),
+
+                                Row(
+
+                                  mainAxisAlignment: MainAxisAlignment.center,
+
+                                  children: [
+
+                                    Text(
+
+                                      _finalGrade['score'].toString(),
+
+                                      style: TextStyle(
+
+                                        fontSize: 48, 
+
+                                        fontWeight: FontWeight.bold,
+
+                                        color: Theme.of(context).colorScheme.primary,
+
+                                      ),
+
+                                    ),
+
+                                    const SizedBox(width: 20),
+
+                                    Container(
+
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+
+                                      decoration: BoxDecoration(
+
+                                        color: Theme.of(context).colorScheme.primary,
+
+                                        borderRadius: BorderRadius.circular(10),
+
+                                      ),
+
+                                      child: Text(
+
+                                        _finalGrade['predikat'],
+
+                                        style: const TextStyle(
+
+                                          fontSize: 32,
+
+                                          fontWeight: FontWeight.bold,
+
+                                          color: Colors.white,
+
+                                        ),
+
+                                      ),
+
+                                    ),
+
+                                  ],
+
+                                ),
+
+                              ],
+
+                            ),
+
+                          ),
+
+                          
+
+                          if (_weights != null) ...[
+
+                            TextButton.icon(
+
+                              onPressed: () {
+
+                                setState(() {
+
+                                  _showCalculationDetails = !_showCalculationDetails;
+
+                                });
+
+                              },
+
+                              icon: Icon(_showCalculationDetails ? Icons.expand_less : Icons.expand_more),
+
+                              label: Text(_showCalculationDetails ? 'Sembunyikan Rincian' : 'Lihat Rincian Perhitungan'),
+
+                            ),
+
+                            if (_showCalculationDetails)
+
+                              Container(
+
+                                margin: const EdgeInsets.only(top: 8),
+
+                                padding: const EdgeInsets.all(16),
+
+                                decoration: BoxDecoration(
+
+                                  color: Colors.grey.withValues(alpha: 0.05),
+
+                                  borderRadius: BorderRadius.circular(12),
+
+                                  border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+
+                                ),
+
+                                child: Column(
+
+                                  children: [
+
+                                    _buildCalculationRow('Tahfidz', _scores['Tahfidz']!, _weights!.tahfidz),
+
+                                    _buildCalculationRow('Fiqh', _scores['Fiqh']!, _weights!.fiqh),
+
+                                    _buildCalculationRow('B. Arab', _scores['Bahasa Arab']!, _weights!.bahasaArab),
+
+                                    _buildCalculationRow('Akhlak', _scores['Akhlak']!, _weights!.akhlak),
+
+                                    _buildCalculationRow('Kehadiran', _scores['Kehadiran']!, _weights!.kehadiran),
+
+                                    const Divider(),
+
+                                    Row(
+
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
+                                      children: [
+
+                                        const Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
+
+                                        Text('${_finalGrade['score']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+
+                                      ],
+
+                                    )
+
+                                  ],
+
+                                ),
+
+                              ),
+
+                          ],
+
+                
+
+                          const SizedBox(height: 80), // Space for FAB
+
+                        ],
+
+                      ),
+
+                    );
+
+                  }
+
+                  
+
+                  Widget _buildCalculationRow(String label, double score, double weight) {
+
+                    double contribution = (score * weight);
+
+                    // Format to 1 decimal place usually enough
+
+                    return Padding(
+
+                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+
+                      child: Row(
+
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
+                        children: [
+
+                          Expanded(child: Text(label)),
+
+                          Text('${score.toStringAsFixed(0)} x ${(weight * 100).toStringAsFixed(0)}%'),
+
+                          const SizedBox(width: 16),
+
+                          Text('= ${contribution.toStringAsFixed(1)}', style: const TextStyle(fontWeight: FontWeight.w500)),
+
+                        ],
+
+                      ),
+
+                    );
+
+                  }
+
+                
+
+                  // --- TAB 2: Kehadiran ---
+
+                
+
+  Widget _buildTabKehadiran() {
+
+    // 1. Helper to check status for a specific day
+
+    String? getStatusForDay(int day) {
+
+      final date = DateTime(_focusedMonth.year, _focusedMonth.month, day);
+
+      // Find matching record (ignoring time)
+
+      try {
+
+        final record = _kehadiranData.firstWhere(
+
+          (k) => k.tanggal.year == date.year && k.tanggal.month == date.month && k.tanggal.day == date.day
+
+        );
+
+        return record.status;
+
+      } catch (e) {
+
+        return null; // No record
+
+      }
+
+    }
+
+
+
+    // 2. Color Mapper
+
+    Color getColorForStatus(String? status) {
+
+      switch (status) {
+
+        case 'H': return Colors.green; // Hadir
+
+        case 'S': return Colors.yellow[700]!; // Sakit
+
+        case 'I': return Colors.blue; // Izin
+
+        case 'A': return Colors.red; // Alpa
+
+        default: return Colors.grey[300]!; // No Data
+
+      }
+
+    }
+
+
+
+    final daysInMonth = DateUtils.getDaysInMonth(_focusedMonth.year, _focusedMonth.month);
+
+    
+
+    return Padding(
+
+      padding: const EdgeInsets.all(16.0),
+
+      child: Column(
+
+        children: [
+
+          // Month Selector
+
+          Row(
+
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
+            children: [
+
+              IconButton(
+
+                icon: const Icon(Icons.chevron_left),
+
+                onPressed: () {
+
+                  setState(() {
+
+                    _focusedMonth = DateTime(_focusedMonth.year, _focusedMonth.month - 1);
+
+                  });
+
+                },
+
+              ),
+
+              Text(
+
+                DateFormat('MMMM yyyy').format(_focusedMonth),
+
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+
+              ),
+
+              IconButton(
+
+                icon: const Icon(Icons.chevron_right),
+
+                onPressed: () {
+
+                  setState(() {
+
+                    _focusedMonth = DateTime(_focusedMonth.year, _focusedMonth.month + 1);
+
+                  });
+
+                },
+
+              ),
+
+            ],
+
+          ),
+
+          const SizedBox(height: 16),
+
+          
+
+          // Legend
+
+          const Wrap(
+
+            spacing: 12,
+
+            runSpacing: 8,
+
+            alignment: WrapAlignment.center,
+
+            children: [
+
+              _StatusLegend(color: Colors.green, label: 'Hadir'),
+
+              _StatusLegend(color: Colors.yellow, label: 'Sakit'),
+
+              _StatusLegend(color: Colors.blue, label: 'Izin'),
+
+              _StatusLegend(color: Colors.red, label: 'Alpa'),
+
+              _StatusLegend(color: Colors.grey, label: 'K/A'),
+
+            ],
+
+          ),
+
+          const SizedBox(height: 24),
+
+
+
+          // Grid
+
+          Expanded(
+
+            child: GridView.builder(
+
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+
+                crossAxisCount: 7, // Weekly layout
+
+                childAspectRatio: 1.0,
+
+                crossAxisSpacing: 8,
+
+                mainAxisSpacing: 8,
+
+              ),
+
+              itemCount: daysInMonth,
+
+              itemBuilder: (context, index) {
+
+                final day = index + 1;
+
+                final status = getStatusForDay(day);
+
+                return Container(
+
+                  decoration: BoxDecoration(
+
+                    color: getColorForStatus(status),
+
+                    borderRadius: BorderRadius.circular(8),
+
+                    border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+
+                  ),
+
+                  child: Center(
+
+                    child: Text(
+
+                      '$day',
+
+                      style: TextStyle(
+
+                        fontWeight: FontWeight.bold,
+
+                        color: status == null ? Colors.black54 : Colors.white,
+
+                      ),
+
+                    ),
+
+                  ),
+
+                );
+
+              },
+
+            ),
+
+          ),
+
+        ],
+
+      ),
+
+    );
+
+  }
+
+
+
+  // --- TAB 3: Grafik ---
+
+  Widget _buildTabGrafik() {
+
+    return _buildTahfidzChart(); // Reuse existing method but it now uses populated _tahfidzData
+
+  }
+
+
+
+  // --- TAB 4: Rapor Summary ---
+
+  Widget _buildTabRaporSummary() {
+
+    return SingleChildScrollView(
+
+      padding: const EdgeInsets.all(16),
+
+      child: Column(
+
+        children: [
+
+          Card(
+
+            child: Padding(
+
+              padding: const EdgeInsets.all(16),
+
+              child: Column(
+
+                children: [
+
+                  const Text(
+
+                    'RINGKASAN RAPOR',
+
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  _buildRaporItem('Nilai Akhir', _finalGrade['score'].toString()),
+
+                  _buildRaporItem('Predikat', _finalGrade['predikat']),
+
+                  _buildRaporItem('Peringkat', '-'), // Rank requires wider context, keeping placeholder
+
+                  const SizedBox(height: 16),
+
+                  ElevatedButton(
+
+                    onPressed: () {
+
+                      Navigator.push(
+
+                        context,
+
+                        MaterialPageRoute(
+
+                          builder: (context) => RaporPage(santri: widget.santri),
+
+                        ),
+
+                      );
+
+                    },
+
+                    child: const Text('Lihat Rapor Lengkap'),
+
+                  ),
+
+                ],
+
+              ),
+
+            ),
+
+          ),
+
+        ],
+
+      ),
+
+    );
+
+  }
+
+
+
+  // --- Helpers ---
+
+
 
   Widget _buildTahfidzChart() {
+
     if (_tahfidzData.isEmpty) {
+
       return const Center(child: Text('Tidak ada data Tahfidz untuk ditampilkan.'));
+
     }
 
-    _tahfidzData.sort((a, b) => a.minggu.compareTo(b.minggu));
 
-    List<FlSpot> spots = _tahfidzData.asMap().entries.map((entry) {
+
+    final sortedData = List<PenilaianTahfidz>.from(_tahfidzData);
+
+    sortedData.sort((a, b) => a.minggu.compareTo(b.minggu));
+
+
+
+    List<FlSpot> spots = sortedData.asMap().entries.map((entry) {
+
       return FlSpot(entry.key.toDouble(), entry.value.nilaiAkhir);
+
     }).toList();
 
+
+
     double minY = spots.map((spot) => spot.y).reduce(min);
+
     double maxY = spots.map((spot) => spot.y).reduce(max);
-    if (maxY < 100) maxY = 100;
+
+    // Pad axis
+
+    minY = (minY - 5).clamp(0, 100);
+
+    maxY = (maxY + 5).clamp(0, 100);
+
+
 
     return Padding(
+
       padding: const EdgeInsets.all(16.0),
+
       child: Column(
+
         crossAxisAlignment: CrossAxisAlignment.start,
+
         children: [
+
           const Text(
+
             'Grafik Perkembangan Tahfidz',
+
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+
           ),
+
           const SizedBox(height: 16),
+
           AspectRatio(
-            aspectRatio: 1.70,
+
+            aspectRatio: 1.5,
+
             child: LineChart(
+
               LineChartData(
+
                 gridData: FlGridData(show: true),
+
                 titlesData: FlTitlesData(
+
                   show: true,
+
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+
                   bottomTitles: AxisTitles(
+
                     sideTitles: SideTitles(
+
                       showTitles: true,
+
                       reservedSize: 30,
-                      getTitlesWidget: (value, meta) {
-                        if (value.toInt() < _tahfidzData.length && value.toInt() >= 0) {
-                          final date = _tahfidzData[value.toInt()].minggu;
-                          return SideTitleWidget(
-                            axisSide: meta.axisSide,
-                            child: Text('${date.day}/${date.month}', style: const TextStyle(fontSize: 10)),
-                          );
-                        }
-                        return const Text('');
-                      },
+
                       interval: 1,
+
+                      getTitlesWidget: (value, meta) {
+
+                        int idx = value.toInt();
+
+                        if (idx >= 0 && idx < sortedData.length) {
+
+                          final date = sortedData[idx].minggu;
+
+                          return SideTitleWidget(
+
+                            axisSide: meta.axisSide,
+
+                            child: Text(
+
+                              '${date.day}/${date.month}', 
+
+                              style: const TextStyle(fontSize: 10),
+
+                            ),
+
+                          );
+
+                        }
+
+                        return const Text('');
+
+                      },
+
                     ),
+
                   ),
+
                 ),
+
                 borderData: FlBorderData(show: true),
+
                 minX: 0,
+
                 maxX: (spots.length - 1).toDouble(),
-                minY: minY > 0 ? (minY - 10).floorToDouble() : 0,
-                maxY: maxY + 10,
+
+                minY: minY,
+
+                maxY: maxY,
+
                 lineBarsData: [
+
                   LineChartBarData(
+
                     spots: spots,
+
                     isCurved: true,
+
                     color: Colors.blueAccent,
+
                     barWidth: 3,
+
                     isStrokeCapRound: true,
-                    belowBarData: BarAreaData(show: true, color: Colors.blueAccent.withOpacity(0.3)),
+
+                    belowBarData: BarAreaData(show: true, color: Colors.blueAccent.withValues(alpha: 0.3)),
+
+                    dotData: const FlDotData(show: true),
+
                   ),
+
                 ],
+
               ),
+
             ),
+
           ),
+
         ],
+
       ),
+
     );
+
   }
+
+
 
   Widget _buildNilaiCard(String mataPelajaran, String nilai, Color color, IconData icon) {
+
     return Card(
+
       margin: const EdgeInsets.only(bottom: 12),
+
       child: ListTile(
+
         leading: Container(
+
           width: 40,
+
           height: 40,
+
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+
+            color: color.withValues(alpha: 0.1),
+
             borderRadius: BorderRadius.circular(20),
+
           ),
+
           child: Icon(icon, color: color),
+
         ),
+
         title: Text(mataPelajaran),
+
         trailing: Container(
+
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+
+            color: color.withValues(alpha: 0.1),
+
             borderRadius: BorderRadius.circular(16),
+
           ),
+
           child: Text(
+
             nilai,
+
             style: TextStyle(
+
               color: color,
+
               fontWeight: FontWeight.bold,
+
             ),
+
           ),
+
         ),
+
       ),
+
     );
+
   }
 
+
+
   Widget _buildRaporItem(String label, String value) {
+
     return Padding(
+
       padding: const EdgeInsets.symmetric(vertical: 8),
+
       child: Row(
+
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
         children: [
+
           Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+
           Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+
         ],
+
       ),
+
     );
+
   }
+
+}
+
+
+
+class _StatusLegend extends StatelessWidget {
+
+  final Color color;
+
+  final String label;
+
+
+
+  const _StatusLegend({required this.color, required this.label});
+
+
+
+  @override
+
+  Widget build(BuildContext context) {
+
+    return Row(
+
+      mainAxisSize: MainAxisSize.min,
+
+      children: [
+
+        Container(
+
+          width: 12,
+
+          height: 12,
+
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+
+        ),
+
+        const SizedBox(width: 4),
+
+        Text(label, style: const TextStyle(fontSize: 12)),
+
+      ],
+
+    );
+
+  }
+
 }
