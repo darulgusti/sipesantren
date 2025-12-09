@@ -8,6 +8,7 @@ class WeightConfigModel {
   final double bahasaArab;
   final double akhlak;
   final double kehadiran;
+  final int maxSantriPerRoom; // New field
 
   WeightConfigModel({
     required this.id,
@@ -16,6 +17,7 @@ class WeightConfigModel {
     required this.bahasaArab,
     required this.akhlak,
     required this.kehadiran,
+    this.maxSantriPerRoom = 6, // Default
   });
 
   factory WeightConfigModel.fromFirestore(DocumentSnapshot doc) {
@@ -27,6 +29,7 @@ class WeightConfigModel {
       bahasaArab: (data['bahasaArab'] as num?)?.toDouble() ?? 0.20,
       akhlak: (data['akhlak'] as num?)?.toDouble() ?? 0.20,
       kehadiran: (data['kehadiran'] as num?)?.toDouble() ?? 0.10,
+      maxSantriPerRoom: (data['maxSantriPerRoom'] as int?) ?? 6,
     );
   }
 
@@ -37,6 +40,7 @@ class WeightConfigModel {
       'bahasaArab': bahasaArab,
       'akhlak': akhlak,
       'kehadiran': kehadiran,
+      'maxSantriPerRoom': maxSantriPerRoom,
     };
   }
 }

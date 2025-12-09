@@ -31,6 +31,10 @@ class _SantriListPageState extends ConsumerState<SantriListPage> {
   List<SantriModel> _allSantri = [];
   bool _isLoading = true;
 
+  // Dynamic filter options
+  List<String> _kamarOptions = ['Semua'];
+  List<String> _angkatanOptions = ['Semua'];
+
   @override
   void initState() {
     super.initState();
@@ -42,9 +46,24 @@ class _SantriListPageState extends ConsumerState<SantriListPage> {
     try {
       final repository = ref.read(santriRepositoryProvider);
       final list = await repository.getSantriList();
+      
+      // Extract unique values for filters
+      final uniqueKamars = list.map((s) => '${s.kamarGedung}-${s.kamarNomor}').toSet().toList();
+      uniqueKamars.sort(); // Alphabetical sort
+      
+      final uniqueAngkatan = list.map((s) => s.angkatan.toString()).toSet().toList();
+      uniqueAngkatan.sort((a, b) => b.compareTo(a)); // Descending sort for year
+
       if (mounted) {
         setState(() {
           _allSantri = list;
+          _kamarOptions = ['Semua', ...uniqueKamars];
+          _angkatanOptions = ['Semua', ...uniqueAngkatan];
+          
+          // Reset selection if no longer valid (though unlikely if data just refreshed, but good practice)
+          if (!_kamarOptions.contains(_selectedKamar)) _selectedKamar = 'Semua';
+          if (!_angkatanOptions.contains(_selectedAngkatan)) _selectedAngkatan = 'Semua';
+          
           _isLoading = false;
         });
       }
@@ -66,7 +85,8 @@ class _SantriListPageState extends ConsumerState<SantriListPage> {
     final filteredSantri = _allSantri.where((santri) {
       final matchesSearch = santri.nama.toLowerCase().contains(_searchQuery) || 
                           santri.nis.contains(_searchQuery);
-      final matchesKamar = _selectedKamar == 'Semua' || (santri.kamarGedung + '-' + santri.kamarNomor.toString()) == _selectedKamar;
+      final currentKamar = '${santri.kamarGedung}-${santri.kamarNomor}';
+      final matchesKamar = _selectedKamar == 'Semua' || currentKamar == _selectedKamar;
       final matchesAngkatan = _selectedAngkatan == 'Semua' || santri.angkatan.toString() == _selectedAngkatan;
       return matchesSearch && matchesKamar && matchesAngkatan;
     }).toList();
@@ -179,12 +199,12 @@ class _SantriListPageState extends ConsumerState<SantriListPage> {
                           child: DropdownButton<String>(
                             isExpanded: true,
                             value: _selectedKamar,
-                            items: const [
-                              DropdownMenuItem(value: 'Semua', child: Text('Semua Kamar')),
-                              DropdownMenuItem(value: 'A3', child: Text('Kamar A3')),
-                              DropdownMenuItem(value: 'B1', child: Text('Kamar B1')),
-                              DropdownMenuItem(value: 'C2', child: Text('Kamar C2')),
-                            ],
+                            items: _kamarOptions.map((String value) {
+                              return DropdownMenuItem<String>(
+                                value: value,
+                                child: Text(value == 'Semua' ? 'Semua Kamar' : 'Kamar $value'),
+                              );
+                            }).toList(),
                             onChanged: (value) {
                               setState(() {
                                 _selectedKamar = value!;
@@ -207,11 +227,12 @@ class _SantriListPageState extends ConsumerState<SantriListPage> {
                           child: DropdownButton<String>(
                             isExpanded: true,
                             value: _selectedAngkatan,
-                            items: const [
-                              DropdownMenuItem(value: 'Semua', child: Text('Semua Angkatan')),
-                              DropdownMenuItem(value: '2023', child: Text('2023')),
-                              DropdownMenuItem(value: '2022', child: Text('2022')),
-                            ],
+                            items: _angkatanOptions.map((String value) {
+                              return DropdownMenuItem<String>(
+                                value: value,
+                                child: Text(value == 'Semua' ? 'Semua Angkatan' : value),
+                              );
+                            }).toList(),
                             onChanged: (value) {
                               setState(() {
                                 _selectedAngkatan = value!;

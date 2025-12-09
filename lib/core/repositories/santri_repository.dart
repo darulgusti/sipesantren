@@ -172,6 +172,18 @@ class SantriRepository {
       // Fetch failed
     }
   }
+  // 7. Get Count in Room
+  Future<int> getSantriCountInRoom(String gedung, int nomor) async {
+    final db = await _dbHelper.database;
+    // Exclude deleted (syncStatus 2)
+    final count = await db.query(
+      'santri',
+      columns: ['COUNT(*)'],
+      where: 'kamarGedung = ? AND kamarNomor = ? AND syncStatus != 2',
+      whereArgs: [gedung, nomor],
+    );
+    return Sqflite.firstIntValue(count) ?? 0;
+  }
 }
 
 final santriRepositoryProvider = Provider((ref) {

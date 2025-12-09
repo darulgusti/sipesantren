@@ -35,6 +35,7 @@ class WeightConfigRepository {
         bahasaArab: 0.20,
         akhlak: 0.20,
         kehadiran: 0.10,
+        maxSantriPerRoom: 6,
       );
       await _db.collection(WeightConfigModel.collectionName).doc(_documentId).set(defaultConfig.toFirestore());
     }
