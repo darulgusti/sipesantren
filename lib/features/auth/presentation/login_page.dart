@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:sipesantren/features/santri/presentation/santri_list_page.dart';
 import 'package:sipesantren/firebase_services.dart';
-import 'package:sipesantren/crypt.dart';
+
 import 'register_page.dart';
 
 class LoginPage extends ConsumerStatefulWidget {

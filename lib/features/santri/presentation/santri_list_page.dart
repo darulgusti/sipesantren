@@ -1,4 +1,5 @@
 // features/santri/presentation/santri_list_page.dart
+import 'package:fl_chart/fl_chart.dart'; // New import
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sipesantren/core/models/santri_model.dart';
@@ -7,6 +8,13 @@ import 'package:sipesantren/features/penilaian/presentation/input_penilaian_page
 import 'package:sipesantren/features/rapor/presentation/rapor_page.dart';
 import 'package:sipesantren/firebase_services.dart';
 import 'package:sipesantren/features/auth/presentation/login_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:sipesantren/core/repositories/penilaian_repository.dart'; // New import
+import 'package:sipesantren/core/models/penilaian_model.dart'; // New import
+import 'dart:math';
+import 'package:sipesantren/core/providers/user_provider.dart'; // New import
+import 'package:sipesantren/features/master_data/presentation/mapel_list_page.dart'; // New import
+import 'package:sipesantren/features/santri/presentation/santri_form_page.dart'; // New import
 
 class SantriListPage extends ConsumerStatefulWidget {
   const SantriListPage({super.key});
@@ -30,23 +38,56 @@ class _SantriListPageState extends ConsumerState<SantriListPage> {
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
         actions: [
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('santri').snapshots(),
+            builder: (context, snapshot) {
+              bool hasPendingWrites = snapshot.hasData && snapshot.data!.metadata.hasPendingWrites;
+              return IconButton(
+                icon: Icon(
+                  hasPendingWrites ? Icons.cloud_upload : Icons.cloud_done,
+                  color: hasPendingWrites ? Colors.orangeAccent : Colors.white,
+                ),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(hasPendingWrites
+                          ? 'Perubahan lokal menunggu sinkronisasi.'
+                          : 'Semua perubahan tersinkronisasi.'),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.sync),
             onPressed: () {
               _showSyncDialog();
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.person_add),
-            onPressed: () {
-              _showAddSantriDialog();
-            },
-          ),
+          if (ref.watch(userProvider).userRole != 'Wali Santri') // Only for Admin/Ustadz
+            IconButton(
+              icon: const Icon(Icons.person_add),
+              onPressed: () {
+                _showAddSantriDialog();
+              },
+            ),
+          if (ref.watch(userProvider).userRole == 'Admin') // Only for Admin
+            IconButton(
+              icon: const Icon(Icons.category),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const MapelListPage()),
+                );
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
               await FirebaseServices().logout();
               if (context.mounted) {
+                ref.read(userProvider.notifier).logout(); // Update userProvider
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(builder: (context) => const LoginPage()),
                 );
@@ -194,7 +235,68 @@ class _SantriListPageState extends ConsumerState<SantriListPage> {
                             // Or we could check metadata.hasPendingWrites if needed
                           ],
                         ),
-                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      trailing: (ref.watch(userProvider).userRole != 'Wali Santri')
+                          ? PopupMenuButton<String>(
+                              onSelected: (value) async {
+                                if (value == 'edit') {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => SantriFormPage(santri: santri),
+                                    ),
+                                  );
+                                } else if (value == 'delete') {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text("Konfirmasi Hapus"),
+                                      content: Text("Anda yakin ingin menghapus ${santri.nama}?"),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.of(context).pop(false),
+                                          child: const Text("BATAL"),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: () => Navigator.of(context).pop(true),
+                                          child: const Text("HAPUS"),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true) {
+                                    await _repository.deleteSantri(santri.id);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('${santri.nama} berhasil dihapus')),
+                                      );
+                                    }
+                                  }
+                                }
+                              },
+                              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                                const PopupMenuItem<String>(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.edit),
+                                      SizedBox(width: 8),
+                                      Text('Edit'),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem<String>(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete),
+                                      SizedBox(width: 8),
+                                      Text('Hapus'),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            )
+                          : const Icon(Icons.arrow_forward_ios, size: 16),
                         onTap: () {
                           Navigator.push(
                             context,
@@ -233,60 +335,41 @@ class _SantriListPageState extends ConsumerState<SantriListPage> {
   }
 
   void _showAddSantriDialog() {
-    final nisController = TextEditingController();
-    final namaController = TextEditingController();
-    final kamarController = TextEditingController();
-    final angkatanController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Tambah Santri Baru'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: nisController, decoration: const InputDecoration(labelText: 'NIS')),
-              TextField(controller: namaController, decoration: const InputDecoration(labelText: 'Nama')),
-              TextField(controller: kamarController, decoration: const InputDecoration(labelText: 'Kamar')),
-              TextField(controller: angkatanController, decoration: const InputDecoration(labelText: 'Angkatan (Tahun)')),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('BATAL'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final santri = SantriModel(
-                id: '', // Firestore auto-id
-                nis: nisController.text,
-                nama: namaController.text,
-                kamar: kamarController.text,
-                angkatan: int.tryParse(angkatanController.text) ?? DateTime.now().year,
-              );
-              await _repository.addSantri(santri);
-              if (context.mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Santri berhasil ditambahkan')),
-                );
-              }
-            },
-            child: const Text('SIMPAN'),
-          ),
-        ],
-      ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SantriFormPage()),
     );
   }
 }
 
-class SantriDetailPage extends StatelessWidget {
+class SantriDetailPage extends ConsumerStatefulWidget {
   final SantriModel santri;
 
   const SantriDetailPage({super.key, required this.santri});
+
+  @override
+  ConsumerState<SantriDetailPage> createState() => _SantriDetailPageState();
+}
+
+class _SantriDetailPageState extends ConsumerState<SantriDetailPage> {
+  final PenilaianRepository _penilaianRepository = PenilaianRepository();
+  List<PenilaianTahfidz> _tahfidzData = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTahfidzData();
+  }
+
+  Future<void> _loadTahfidzData() async {
+    _penilaianRepository.getTahfidzBySantri(widget.santri.id).listen((data) {
+      setState(() {
+        _tahfidzData = data;
+        _isLoading = false;
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -294,7 +377,7 @@ class SantriDetailPage extends StatelessWidget {
       length: 4,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(santri.nama),
+          title: Text(widget.santri.nama),
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Penilaian'),
@@ -318,18 +401,19 @@ class SantriDetailPage extends StatelessWidget {
                   _buildNilaiCard('Akhlak', '94', Colors.purple, Icons.emoji_people),
                   _buildNilaiCard('Kehadiran', '90', Colors.red, Icons.calendar_today),
                   const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => InputPenilaianPage(santri: santri),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.add),
-                    label: const Text('Input Penilaian Baru'),
-                  ),
+                  if (ref.watch(userProvider).userRole != 'Wali Santri')
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => InputPenilaianPage(santri: widget.santri),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text('Input Penilaian Baru'),
+                    ),
                 ],
               ),
             ),
@@ -338,7 +422,9 @@ class SantriDetailPage extends StatelessWidget {
             const Center(child: Text('Data Kehadiran akan ditampilkan di sini')),
 
             // Tab Grafik
-            const Center(child: Text('Grafik perkembangan Tahfidz')),
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _buildTahfidzChart(),
 
             // Tab Rapor
             SingleChildScrollView(
@@ -364,7 +450,7 @@ class SantriDetailPage extends StatelessWidget {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => RaporPage(santri: santri),
+                                  builder: (context) => RaporPage(santri: widget.santri),
                                 ),
                               );
                             },
@@ -379,6 +465,118 @@ class SantriDetailPage extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTahfidzChart() {
+    if (_tahfidzData.isEmpty) {
+      return const Center(child: Text('Tidak ada data Tahfidz untuk ditampilkan.'));
+    }
+
+    _tahfidzData.sort((a, b) => a.minggu.compareTo(b.minggu)); // Sort by date
+
+    // Prepare data for the chart
+    List<FlSpot> spots = _tahfidzData.asMap().entries.map((entry) {
+      // Use index as x-axis for chronological order
+      return FlSpot(entry.key.toDouble(), entry.value.nilaiAkhir);
+    }).toList();
+
+    // Determine min/max Y values for appropriate scaling
+    double minY = spots.map((spot) => spot.y).reduce(min);
+    double maxY = spots.map((spot) => spot.y).reduce(max);
+    if (maxY < 100) maxY = 100; // Ensure Y-axis goes up to at least 100
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Grafik Perkembangan Tahfidz',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          AspectRatio(
+            aspectRatio: 1.70,
+            child: LineChart(
+              LineChartData(
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: true,
+                  horizontalInterval: 20,
+                  verticalInterval: 1,
+                  getDrawingHorizontalLine: (value) {
+                    return const FlLine(
+                      color: Color(0xff37434d),
+                      strokeWidth: 1,
+                    );
+                  },
+                  getDrawingVerticalLine: (value) {
+                    return const FlLine(
+                      color: Color(0xff37434d),
+                      strokeWidth: 1,
+                    );
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 30,
+                      getTitlesWidget: (value, meta) {
+                        if (value.toInt() < _tahfidzData.length) {
+                          final date = _tahfidzData[value.toInt()].minggu;
+                          return SideTitleWidget(
+                            axisSide: meta.axisSide,
+                            child: Text('${date.day}/${date.month}', style: const TextStyle(fontSize: 10)),
+                          );
+                        }
+                        return const Text('');
+                      },
+                      interval: 1,
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 40,
+                      getTitlesWidget: (value, meta) {
+                        return Text(value.toInt().toString(), style: const TextStyle(fontSize: 10));
+                      },
+                      interval: 20,
+                    ),
+                  ),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                borderData: FlBorderData(
+                  show: true,
+                  border: Border.all(color: const Color(0xff37434d), width: 1),
+                ),
+                minX: 0,
+                maxX: (spots.length - 1).toDouble(),
+                minY: minY > 0 ? (minY - 10).floorToDouble() : 0, // Extend a bit below min
+                maxY: maxY + 10, // Extend a bit above max
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: true,
+                    color: Colors.blueAccent,
+                    barWidth: 3,
+                    isStrokeCapRound: true,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: Colors.blueAccent.withOpacity(0.3),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

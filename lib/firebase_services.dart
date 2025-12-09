@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:sipesantren/crypt.dart';
+
 
 class FirebaseServices {
   final FirebaseFirestore db = FirebaseFirestore.instance;
@@ -57,7 +57,6 @@ class FirebaseServices {
 
       final doc = query.docs.first;
       final data = doc.data();
-      final storedHash = data['hashed_password'] as String;
       
       // Verify password
       // Assuming PasswordHandler.verifyPassword exists or similar logic. 

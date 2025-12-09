@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:sipesantren/core/models/penilaian_model.dart';
 import 'package:sipesantren/core/models/santri_model.dart';
 import 'package:sipesantren/core/repositories/penilaian_repository.dart';
+import 'package:sipesantren/core/models/mapel_model.dart'; // New import
+import 'package:sipesantren/core/repositories/mapel_repository.dart'; // New import
 
 class InputPenilaianPage extends StatefulWidget {
   final SantriModel? santri; // Optional for standalone, but usually required
@@ -14,8 +16,11 @@ class InputPenilaianPage extends StatefulWidget {
 
 class _InputPenilaianPageState extends State<InputPenilaianPage> {
   int _selectedIndex = 0;
-  final List<String> _jenisPenilaian = ['Tahfidz', 'Fiqh', 'Bahasa Arab', 'Akhlak', 'Kehadiran'];
   final PenilaianRepository _repository = PenilaianRepository();
+  final MapelRepository _mapelRepository = MapelRepository(); // New
+  List<MapelModel> _mapelList = []; // New
+  List<String> _jenisPenilaian = ['Tahfidz', 'Akhlak', 'Kehadiran']; // Modified
+  int _mapelStartIndex = 0; // New: index where mapel items start in _jenisPenilaian
 
   // Controllers - Tahfidz
   final _tahfidzSurahController = TextEditingController();
@@ -37,6 +42,39 @@ class _InputPenilaianPageState extends State<InputPenilaianPage> {
   // State - Kehadiran
   DateTime _kehadiranTanggal = DateTime.now();
   String _kehadiranStatus = 'H';
+
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMapelList();
+  }
+
+  Future<void> _loadMapelList() async {
+    _mapelRepository.getMapelList().listen((mapel) {
+      setState(() {
+        _mapelList = mapel;
+        _jenisPenilaian = ['Tahfidz'];
+        for (var m in _mapelList) {
+          _jenisPenilaian.add(m.name);
+        }
+        _mapelStartIndex = _jenisPenilaian.length - _mapelList.length; // Index where mapel start
+        _jenisPenilaian.addAll(['Akhlak', 'Kehadiran']);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _tahfidzSurahController.dispose();
+    _tahfidzAyatSetorController.dispose();
+    _tahfidzTargetAyatController.dispose();
+    _tahfidzTajwidController.dispose();
+    _mapelFormatifController.dispose();
+    _mapelSumatifController.dispose();
+    _akhlakCatatanController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -102,20 +140,24 @@ class _InputPenilaianPageState extends State<InputPenilaianPage> {
   }
 
   Widget _buildFormByType() {
-    switch (_selectedIndex) {
-      case 0: // Tahfidz
-        return _buildTahfidzForm();
-      case 1: // Fiqh
-        return _buildMapelForm('Fiqh');
-      case 2: // Bahasa Arab
-        return _buildMapelForm('Bahasa Arab');
-      case 3: // Akhlak
-        return _buildAkhlakForm();
-      case 4: // Kehadiran
-        return _buildKehadiranForm();
-      default:
-        return Container();
+    // Check for Tahfidz (always at index 0)
+    if (_selectedIndex == 0) {
+      return _buildTahfidzForm();
     }
+    // Check for dynamic Mapel
+    if (_selectedIndex >= _mapelStartIndex && _selectedIndex < _mapelStartIndex + _mapelList.length) {
+      final mapelName = _jenisPenilaian[_selectedIndex];
+      return _buildMapelForm(mapelName);
+    }
+    // Check for Akhlak (second to last)
+    if (_selectedIndex == _jenisPenilaian.length - 2) {
+      return _buildAkhlakForm();
+    }
+    // Check for Kehadiran (last)
+    if (_selectedIndex == _jenisPenilaian.length - 1) {
+      return _buildKehadiranForm();
+    }
+    return Container();
   }
 
   Widget _buildTahfidzForm() {

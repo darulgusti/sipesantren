@@ -1,3 +1,5 @@
+import 'dart:io'; // New import for File
+import 'dart:typed_data'; // New import for Uint8List
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -6,6 +8,8 @@ import 'package:sipesantren/core/models/penilaian_model.dart';
 import 'package:sipesantren/core/models/santri_model.dart';
 import 'package:sipesantren/core/repositories/penilaian_repository.dart';
 import 'package:sipesantren/core/services/grading_service.dart';
+import 'package:share_plus/share_plus.dart'; // New import
+import 'package:path_provider/path_provider.dart'; // New import
 
 class RaporPage extends StatefulWidget {
   final SantriModel? santri;
@@ -21,6 +25,7 @@ class _RaporPageState extends State<RaporPage> {
 
   Map<String, double> _scores = {};
   Map<String, dynamic> _finalGrade = {};
+  String _akhlakCatatan = ''; // New state variable
   bool _loading = true;
 
   @override
@@ -39,6 +44,16 @@ class _RaporPageState extends State<RaporPage> {
     final mapelList = await _repository.getMapelBySantri(santriId).first;
     final akhlakList = await _repository.getAkhlakBySantri(santriId).first;
     final kehadiranList = await _repository.getKehadiranBySantri(santriId).first;
+
+    // Extract latest Akhlak note if available
+    if (akhlakList.isNotEmpty) {
+      // Assuming sorting by date is not necessary for "latest" here,
+      // as `akhlakList` comes from a stream which might not guarantee order.
+      // For simplicity, let's take the first one or assume the stream provides latest first.
+      // If order matters, we'd need a timestamp in PenilaianAkhlak and sort.
+      // For now, let's just take the first available.
+      _akhlakCatatan = akhlakList.last.catatan; // Taking the last one assuming more recent.
+    }
 
     // Calculate
     final tahfidzScore = _gradingService.calculateTahfidz(tahfidzList);
@@ -88,11 +103,36 @@ class _RaporPageState extends State<RaporPage> {
       appBar: AppBar(
         title: const Text('Rapor Santri'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.picture_as_pdf),
-            onPressed: () {
-              _generateAndPrintPdf();
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'print') {
+                await _generatePdfAndPrint();
+              } else if (value == 'share') {
+                await _generatePdfAndShare();
+              }
             },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              const PopupMenuItem<String>(
+                value: 'print',
+                child: Row(
+                  children: [
+                    Icon(Icons.print),
+                    SizedBox(width: 8),
+                    Text('Cetak Rapor'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'share',
+                child: Row(
+                  children: [
+                    Icon(Icons.share),
+                    SizedBox(width: 8),
+                    Text('Bagikan Rapor'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -174,6 +214,15 @@ class _RaporPageState extends State<RaporPage> {
                     _buildNilaiDetailRow('Kehadiran (10%)', '${_scores['Kehadiran']}'),
                     const Divider(),
                     _buildNilaiDetailRow('NILAI AKHIR', '${_finalGrade['score']}', isBold: true),
+                    if (_akhlakCatatan.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Catatan Ustadz:',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(_akhlakCatatan),
+                    ],
                   ],
                 ),
               ),
@@ -285,7 +334,8 @@ class _RaporPageState extends State<RaporPage> {
     );
   }
 
-  Future<void> _generateAndPrintPdf() async {
+  // Common function to generate PDF document
+  Future<Uint8List> _generatePdfDocument() async {
     final doc = pw.Document();
     
     doc.addPage(
@@ -304,7 +354,7 @@ class _RaporPageState extends State<RaporPage> {
               pw.Text('Kamar: ${widget.santri!.kamar}'),
               pw.SizedBox(height: 30),
               
-              pw.Table.fromTextArray(context: context, data: <List<String>>[
+pw.Table.fromTextArray(context: context, data: <List<String>>[
                 <String>['Mata Pelajaran', 'Nilai', 'Bobot'],
                 <String>['Tahfidz', '${_scores['Tahfidz']}', '30%'],
                 <String>['Fiqh', '${_scores['Fiqh']}', '20%'],
@@ -313,23 +363,41 @@ class _RaporPageState extends State<RaporPage> {
                 <String>['Kehadiran', '${_scores['Kehadiran']}', '10%'],
               ]),
               
-              pw.Divider(),
-              pw.SizedBox(height: 10),
-              pw.Row(
+pw.Divider(),
+pw.SizedBox(height: 10),
+pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.end,
                 children: [
                    pw.Text('Nilai Akhir: ${_finalGrade['score']} (Predikat: ${_finalGrade['predikat']})', 
                      style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
                 ]
               ),
+              if (_akhlakCatatan.isNotEmpty) ...[
+                pw.SizedBox(height: 20),
+                pw.Text('Catatan Ustadz:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text(_akhlakCatatan),
+              ],
             ],
           );
         },
       ),
     );
+    return doc.save();
+  }
 
+  Future<void> _generatePdfAndPrint() async {
+    final Uint8List pdfBytes = await _generatePdfDocument();
     await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => doc.save(),
+      onLayout: (PdfPageFormat format) async => pdfBytes,
     );
+  }
+
+  Future<void> _generatePdfAndShare() async {
+    final Uint8List pdfBytes = await _generatePdfDocument();
+    final directory = await getTemporaryDirectory();
+    final file = File('${directory.path}/${widget.santri!.nama}_Rapor.pdf');
+    await file.writeAsBytes(pdfBytes);
+
+    await Share.shareXFiles([XFile(file.path)], text: 'Rapor ${widget.santri!.nama}');
   }
 }
