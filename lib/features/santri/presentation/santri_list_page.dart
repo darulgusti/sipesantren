@@ -69,13 +69,7 @@ class _SantriListPageState extends ConsumerState<SantriListPage> {
               _showSyncDialog();
             },
           ),
-          if (ref.watch(userProvider).userRole != 'Wali Santri') // Only for Admin/Ustadz
-            IconButton(
-              icon: const Icon(Icons.person_add),
-              onPressed: () {
-                _showAddSantriDialog();
-              },
-            ),
+
           if (ref.watch(userProvider).userRole == 'Admin') // Only for Admin
             IconButton(
               icon: const Icon(Icons.category),
@@ -358,6 +352,14 @@ class _SantriListPageState extends ConsumerState<SantriListPage> {
           ),
         ],
       ),
+      floatingActionButton: (ref.watch(userProvider).userRole != 'Wali Santri')
+          ? FloatingActionButton(
+              onPressed: _showAddSantriDialog,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Colors.white,
+              child: const Icon(Icons.person_add),
+            )
+          : null,
     );
   }
 
