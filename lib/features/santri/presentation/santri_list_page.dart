@@ -23,13 +23,17 @@ class SantriListPage extends ConsumerStatefulWidget {
   ConsumerState<SantriListPage> createState() => _SantriListPageState();
 }
 
-class _SantriListPageState extends ConsumerState<SantriListPage> {
+class _SantriListPageState extends ConsumerState<SantriListPage> with SingleTickerProviderStateMixin {
   String _selectedKamar = 'Semua';
   String _selectedAngkatan = 'Semua';
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   List<SantriModel> _allSantri = [];
   bool _isLoading = true;
+  bool _isSyncing = false; // New state
+
+  // Animation controller for sync rotation
+  late AnimationController _syncAnimationController;
 
   // Dynamic filter options
   List<String> _kamarOptions = ['Semua'];
@@ -38,21 +42,31 @@ class _SantriListPageState extends ConsumerState<SantriListPage> {
   @override
   void initState() {
     super.initState();
+    _syncAnimationController = AnimationController(
+      duration: const Duration(seconds: 1),
+      vsync: this,
+    );
     _loadData();
   }
 
+  @override
+  void dispose() {
+    _syncAnimationController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadData() async {
+    // ... existing loadData logic ...
     setState(() => _isLoading = true);
     try {
       final repository = ref.read(santriRepositoryProvider);
       final list = await repository.getSantriList();
       
-      // Extract unique values for filters
       final uniqueKamars = list.map((s) => '${s.kamarGedung}-${s.kamarNomor}').toSet().toList();
-      uniqueKamars.sort(); // Alphabetical sort
+      uniqueKamars.sort(); 
       
       final uniqueAngkatan = list.map((s) => s.angkatan.toString()).toSet().toList();
-      uniqueAngkatan.sort((a, b) => b.compareTo(a)); // Descending sort for year
+      uniqueAngkatan.sort((a, b) => b.compareTo(a)); 
 
       if (mounted) {
         setState(() {
@@ -60,7 +74,6 @@ class _SantriListPageState extends ConsumerState<SantriListPage> {
           _kamarOptions = ['Semua', ...uniqueKamars];
           _angkatanOptions = ['Semua', ...uniqueAngkatan];
           
-          // Reset selection if no longer valid (though unlikely if data just refreshed, but good practice)
           if (!_kamarOptions.contains(_selectedKamar)) _selectedKamar = 'Semua';
           if (!_angkatanOptions.contains(_selectedAngkatan)) _selectedAngkatan = 'Semua';
           
@@ -77,11 +90,49 @@ class _SantriListPageState extends ConsumerState<SantriListPage> {
     }
   }
 
+  Future<void> _performSync() async {
+    if (_isSyncing) return; // Prevent multiple clicks
+
+    setState(() {
+      _isSyncing = true;
+    });
+    _syncAnimationController.repeat(); // Start rotating
+
+    try {
+      final santriRepo = ref.read(santriRepositoryProvider);
+      final penilaianRepo = ref.read(penilaianRepositoryProvider);
+
+      // Perform sync
+      await santriRepo.syncPendingChanges();
+      await penilaianRepo.syncPendingChanges();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sinkronisasi selesai (jika online).')),
+        );
+        _loadData(); // Refresh list to update status icons
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal sinkronisasi: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+        });
+        _syncAnimationController.stop(); // Stop rotating
+        _syncAnimationController.reset(); // Reset position
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final _repository = ref.read(santriRepositoryProvider);
     
-    // Filtering logic
     final filteredSantri = _allSantri.where((santri) {
       final matchesSearch = santri.nama.toLowerCase().contains(_searchQuery) || 
                           santri.nis.contains(_searchQuery);
@@ -98,12 +149,14 @@ class _SantriListPageState extends ConsumerState<SantriListPage> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.sync),
-            tooltip: 'Sinkronisasi Manual',
-            onPressed: () {
-              _showSyncDialog();
-            },
+          // Rotating Sync Icon
+          RotationTransition(
+            turns: _syncAnimationController,
+            child: IconButton(
+              icon: const Icon(Icons.sync),
+              tooltip: 'Sinkronisasi Manual',
+              onPressed: _performSync,
+            ),
           ),
           if (ref.watch(userProvider).userRole == 'Admin')
             IconButton(
@@ -389,44 +442,6 @@ class _SantriListPageState extends ConsumerState<SantriListPage> {
             )
           : null,
     );
-  }
-
-  void _showSyncDialog() {
-    // Manually trigger sync
-    // In a real app, this might show progress.
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Sinkronisasi Data'),
-          content: const Text('Sedang mencoba sinkronisasi data ke server...'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                 Navigator.pop(context);
-              }, 
-              child: const Text('Tutup')
-            )
-          ],
-        );
-      }
-    );
-    // Trigger sync
-    // Use the synchronization service
-    // Note: SynchronizationService is automatically started if watched, but here we might want to force check.
-    // Since we don't have a direct "forceSync" on provider without instance, we can rely on repositories.
-    // Or access the service if we expose a method.
-    // For now, let's just trigger repo syncs.
-    ref.read(santriRepositoryProvider).syncPendingChanges().then((_) {
-      ref.read(penilaianRepositoryProvider).syncPendingChanges().then((_) {
-         if (mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-             const SnackBar(content: Text('Sinkronisasi selesai (jika online).'))
-           );
-           _loadData(); // Reload list to update status icons
-         }
-      });
-    });
   }
 }
 
