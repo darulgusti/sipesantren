@@ -7,7 +7,8 @@ import 'firebase_services.dart';
 import 'package:sipesantren/core/providers/user_provider.dart'; // New import
 
 import 'features/auth/presentation/login_page.dart';
-import 'features/santri/presentation/santri_list_page.dart';
+import 'package:sipesantren/features/dashboard/presentation/dashboard_page.dart'; // New import
+import 'package:sipesantren/features/santri/presentation/santri_list_page.dart'; // Keep SantriListPage import for now
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,16 +35,16 @@ class _MyAppState extends ConsumerState<MyApp> { // Changed to ConsumerState
   }
 
   Future<void> _checkSession() async {
-    final _auth = ref.read(firebaseServicesProvider); // Use provider
+    final _auth = ref.read(firebaseServicesProvider);
     final session = await _auth.getUserSession();
     if (session['id'] != null) {
+      final roleToUse = session['role'] ?? 'Ustadz';
       ref.read(userProvider.notifier).login(
             session['id']!,
-            session['role'] ?? 'Ustadz', // Default role if not found
-            session['name'] ?? 'User', // Default name if not found
+            roleToUse,
+            session['name'] ?? 'User',
           );
     }
-    ref.read(userProvider.notifier).sessionCheckCompleted(); // Indicate session check is complete
   }
 
   @override
@@ -65,7 +66,7 @@ class _MyAppState extends ConsumerState<MyApp> { // Changed to ConsumerState
         fontFamily: 'Poppins',
         useMaterial3: true,
       ),
-      home: userState.isLoggedIn ? const SantriListPage() : const LoginPage(), // Use userState
+      home: userState.isLoggedIn ? const DashboardPage() : const LoginPage(), // Navigate to DashboardPage
       debugShowCheckedModeBanner: false,
     );
   }

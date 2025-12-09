@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 
 class UserState {
   final String? userId;
@@ -45,7 +46,7 @@ class UserNotifier extends StateNotifier<UserState> {
       userRole: role,
       userName: name,
       isLoggedIn: true,
-      isLoadingSession: false, // Session check completed
+      isLoadingSession: false,
     );
   }
 

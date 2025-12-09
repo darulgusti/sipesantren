@@ -1,6 +1,9 @@
 // features/auth/presentation/login_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sipesantren/features/dashboard/presentation/dashboard_page.dart';
+
+import 'package:sipesantren/core/providers/user_provider.dart';
 
 import 'package:sipesantren/features/santri/presentation/santri_list_page.dart';
 import 'package:sipesantren/firebase_services.dart';
@@ -132,17 +135,26 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               setState(() {
                                 loading = true;
                               });
-                              
+
                               final user = await db.login(_emailController.text, _passwordController.text);
-                              
+
                               if (user != null) {
                                 // Save session
                                 await db.saveUserSession(
-                                  user['id'], 
-                                  user['role'] ?? 'Ustadz', 
+                                  user['id'],
+                                  user['role'] ?? 'Ustadz',
                                   user['name'] ?? 'User'
                                 );
-                                
+
+                                // Update the userProvider state after successful login
+                                if (mounted) {
+                                  ref.read(userProvider.notifier).login(
+                                    user['id'],
+                                    user['role'] ?? 'Ustadz',
+                                    user['name'] ?? 'User',
+                                  );
+                                }
+
                                 if (mounted) {
                                   setState(() {
                                     loading = false;
@@ -150,7 +162,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                   Navigator.pushReplacement(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => const SantriListPage(),
+                                      builder: (context) => const DashboardPage(),
                                     ),
                                   );
                                 }
