@@ -5,6 +5,8 @@ class UserState {
   final String? userId;
   final String? userRole;
   final String? userName;
+  final String? requestedRole;
+  final String? requestStatus;
   final bool isLoggedIn;
   final bool isLoadingSession; // New field
 
@@ -12,6 +14,8 @@ class UserState {
     this.userId,
     this.userRole,
     this.userName,
+    this.requestedRole,
+    this.requestStatus,
     this.isLoggedIn = false,
     this.isLoadingSession = true, // Default to true
   });
@@ -20,6 +24,8 @@ class UserState {
     String? userId,
     String? userRole,
     String? userName,
+    String? requestedRole,
+    String? requestStatus,
     bool? isLoggedIn,
     bool? isLoadingSession, // New field
   }) {
@@ -27,6 +33,8 @@ class UserState {
       userId: userId ?? this.userId,
       userRole: userRole ?? this.userRole,
       userName: userName ?? this.userName,
+      requestedRole: requestedRole ?? this.requestedRole,
+      requestStatus: requestStatus ?? this.requestStatus,
       isLoggedIn: isLoggedIn ?? this.isLoggedIn,
       isLoadingSession: isLoadingSession ?? this.isLoadingSession, // New field
     );
@@ -42,13 +50,32 @@ class UserNotifier extends StateNotifier<UserState> {
 
   UserNotifier(this._ref) : super(UserState()); // Accept ref in constructor
 
-  void login(String id, String role, String name) {
+  void login(String id, String role, String name, {String? requestedRole, String? requestStatus}) {
+    // We recreate UserState to ensure we can set fields to null if needed, 
+    // or we'd need a more complex copyWith.
+    // However, to fix the specific issue of clearing status, we add clearRequestStatus.
+    // But login() acts as a "set state" here. 
+    // Let's rely on clearRequestStatus for the specific action.
     state = state.copyWith(
       userId: id,
       userRole: role,
       userName: name,
+      requestedRole: requestedRole,
+      requestStatus: requestStatus,
       isLoggedIn: true,
       isLoadingSession: false,
+    );
+  }
+
+  void clearRequestStatus() {
+    state = UserState(
+      userId: state.userId,
+      userRole: state.userRole,
+      userName: state.userName,
+      isLoggedIn: state.isLoggedIn,
+      isLoadingSession: state.isLoadingSession,
+      requestedRole: null,
+      requestStatus: null,
     );
   }
 

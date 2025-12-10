@@ -23,6 +23,7 @@ class FirebaseServices {
       "hashed_password": hashedPassword,
       "role": role,
       "requested_role": requestedRole,
+      "request_status": requestedRole != null ? 'pending' : null,
       "created_at": FieldValue.serverTimestamp(),
     };
 
@@ -85,10 +86,20 @@ class FirebaseServices {
     return user != null;
   }
 
-  Future<void> saveUserSession(String id, String role, String name) async {
+  Future<void> saveUserSession(String id, String role, String name, {String? requestedRole, String? requestStatus}) async {
     await _storage.write(key: 'user_id', value: id);
     await _storage.write(key: 'user_role', value: role);
     await _storage.write(key: 'user_name', value: name);
+    if (requestedRole != null) {
+      await _storage.write(key: 'user_requested_role', value: requestedRole);
+    } else {
+      await _storage.delete(key: 'user_requested_role');
+    }
+    if (requestStatus != null) {
+      await _storage.write(key: 'user_request_status', value: requestStatus);
+    } else {
+      await _storage.delete(key: 'user_request_status');
+    }
   }
 
   Future<Map<String, String?>> getUserSession() async {
@@ -97,12 +108,14 @@ class FirebaseServices {
       String? id = await _storage.read(key: 'user_id');
       String? role = await _storage.read(key: 'user_role');
       String? name = await _storage.read(key: 'user_name');
-      debugPrint("FirebaseServices: User session retrieved - ID: $id, Role: $role, Name: $name");
-      return {'id': id, 'role': role, 'name': name};
+      String? requestedRole = await _storage.read(key: 'user_requested_role');
+      String? requestStatus = await _storage.read(key: 'user_request_status');
+      debugPrint("FirebaseServices: User session retrieved - ID: $id, Role: $role, Name: $name, RequestedRole: $requestedRole, RequestStatus: $requestStatus");
+      return {'id': id, 'role': role, 'name': name, 'requested_role': requestedRole, 'request_status': requestStatus};
     } catch (e) {
       debugPrint("FirebaseServices: Error getting user session: $e");
       // Return an empty map to ensure the Future completes and allows the app to proceed
-      return {'id': null, 'role': null, 'name': null};
+      return {'id': null, 'role': null, 'name': null, 'requested_role': null, 'request_status': null};
     }
   }
 
@@ -111,6 +124,8 @@ class FirebaseServices {
     await _storage.delete(key: 'user_id');
     await _storage.delete(key: 'user_role');
     await _storage.delete(key: 'user_name');
+    await _storage.delete(key: 'user_requested_role');
+    await _storage.delete(key: 'user_request_status');
 
     debugPrint("FirebaseServices: Explicit key deletion completed. Verifying contents...");
     String? id = await _storage.read(key: 'user_id');
@@ -158,6 +173,7 @@ class FirebaseServices {
       await db.collection('users').doc(userId).update({
         'role': newRole,
         'requested_role': null,
+        'request_status': null,
       });
       return true;
     } catch (e) {
@@ -169,11 +185,24 @@ class FirebaseServices {
   Future<bool> rejectUserRoleRequest(String userId) async {
     try {
       await db.collection('users').doc(userId).update({
-        'requested_role': null,
+        'request_status': 'rejected',
       });
       return true;
     } catch (e) {
       debugPrint("Error rejecting user role request: $e");
+      return false;
+    }
+  }
+
+  Future<bool> dismissRequestStatus(String userId) async {
+    try {
+      await db.collection('users').doc(userId).update({
+        'requested_role': null,
+        'request_status': null,
+      });
+      return true;
+    } catch (e) {
+      debugPrint("Error dismissing request status: $e");
       return false;
     }
   }

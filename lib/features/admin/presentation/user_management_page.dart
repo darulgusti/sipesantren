@@ -378,7 +378,7 @@ class _UserListItem extends StatelessWidget {
                             ),
                       ),
                     ),
-                    if (user.requestedRole != null)
+                    if (user.requestedRole != null && user.requestStatus == 'pending')
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
@@ -399,7 +399,7 @@ class _UserListItem extends StatelessWidget {
               ],
             ),
           ),
-          if (user.requestedRole != null) ...[
+          if (user.requestedRole != null && user.requestStatus == 'pending') ...[
             IconButton(
               icon: const Icon(Icons.check_circle, color: Colors.green),
               tooltip: 'Setujui',
