@@ -67,7 +67,10 @@ class UserManagementPage extends ConsumerWidget {
     final nameController = TextEditingController(text: user?.name);
     final emailController = TextEditingController(text: user?.email);
     final passwordController = TextEditingController();
-    String? selectedRole = user?.role ?? 'Ustadz';
+    String selectedRole = user?.role ?? 'Ustadz';
+    if (selectedRole == 'Wali Santri') {
+      selectedRole = 'Wali';
+    }
 
     await showDialog(
       context: context,
@@ -116,11 +119,15 @@ class UserManagementPage extends ConsumerWidget {
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.category),
                   ),
-                  items: ['Admin', 'Ustadz', 'Wali Santri'].map((role) {
-                    return DropdownMenuItem(value: role, child: Text(role));
-                  }).toList(),
+                  items: const [
+                    DropdownMenuItem(value: 'Admin', child: Text('Admin')),
+                    DropdownMenuItem(value: 'Ustadz', child: Text('Ustadz')),
+                    DropdownMenuItem(value: 'Wali', child: Text('Wali Santri')),
+                  ],
                   onChanged: (value) {
-                    selectedRole = value;
+                    if (value != null) {
+                      selectedRole = value;
+                    }
                   },
                 ),
               ],
@@ -146,7 +153,7 @@ class UserManagementPage extends ConsumerWidget {
                       user!.id,
                       nameController.text,
                       emailController.text,
-                      selectedRole!,
+                      selectedRole,
                     );
                     Fluttertoast.showToast(msg: 'Pengguna berhasil diperbarui!');
                   } else {
@@ -163,7 +170,7 @@ class UserManagementPage extends ConsumerWidget {
                       nameController.text,
                       emailController.text,
                       hashedPassword,
-                      selectedRole!,
+                      selectedRole,
                     );
                     Fluttertoast.showToast(msg: 'Pengguna berhasil ditambahkan!');
                   }
