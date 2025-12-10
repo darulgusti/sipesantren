@@ -215,20 +215,48 @@ class DashboardPage extends ConsumerWidget {
                           requestStatus: updatedUser.requestStatus,
                         );
 
-                        if (updatedUser.requestStatus == null && updatedUser.requestedRole == null) {
-                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Permintaan Anda telah diproses.")),
-                          );
-                        } else if (updatedUser.requestStatus == 'rejected') {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Permintaan peran Anda telah ditolak.")),
-                          );
-                        } else {
+                        if (updatedUser.requestStatus == 'pending') {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text("Status masih menunggu persetujuan.")),
                           );
                         }
                       }
+                    },
+                  )
+                ],
+              ),
+            ),
+          if (userState.requestStatus == 'approved')
+            Container(
+              width: double.infinity,
+              color: Colors.green[100],
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle_outline, color: Colors.green[900]),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      "Permintaan peran Anda telah disetujui.",
+                      style: TextStyle(color: Colors.green[900], fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: Colors.green[900]),
+                    onPressed: () async {
+                      final firebaseServices = ref.read(firebaseServicesProvider);
+                      await firebaseServices.dismissRequestStatus(userState.userId!);
+                      
+                       // Update session and provider to clear the status
+                        await firebaseServices.saveUserSession(
+                          userState.userId!,
+                          userState.userRole!,
+                          userState.userName!,
+                          requestedRole: null,
+                          requestStatus: null,
+                        );
+
+                        ref.read(userProvider.notifier).clearRequestStatus();
                     },
                   )
                 ],

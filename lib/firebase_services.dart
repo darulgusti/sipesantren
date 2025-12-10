@@ -173,7 +173,7 @@ class FirebaseServices {
       await db.collection('users').doc(userId).update({
         'role': newRole,
         'requested_role': null,
-        'request_status': null,
+        'request_status': 'approved',
       });
       return true;
     } catch (e) {
