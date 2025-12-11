@@ -25,7 +25,7 @@ class DatabaseHelper {
     String databasePath = join(path, 'sipesantren.db');
     return await openDatabase(
       databasePath,
-      version: 3,
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -36,6 +36,30 @@ class DatabaseHelper {
   }
 
   Future<void> _createTables(Database db) async {
+    // Aktivitas Kelas Table
+    await db.execute('''
+      CREATE TABLE aktivitas_kelas(
+        id TEXT PRIMARY KEY,
+        kelasId TEXT,
+        type TEXT,
+        title TEXT,
+        description TEXT,
+        authorId TEXT,
+        createdAt INTEGER,
+        syncStatus INTEGER DEFAULT 0
+      )
+    ''');
+
+    // Kelas Table
+    await db.execute('''
+      CREATE TABLE kelas(
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        waliKelasId TEXT,
+        syncStatus INTEGER DEFAULT 0
+      )
+    ''');
+
     // Santri Table
     await db.execute('''
       CREATE TABLE santri(
@@ -45,6 +69,19 @@ class DatabaseHelper {
         kamarGedung TEXT,
         kamarNomor INTEGER,
         angkatan INTEGER,
+        kelasId TEXT,
+        waliSantriId TEXT,
+        syncStatus INTEGER DEFAULT 0
+      )
+    ''');
+
+    // Teaching Assignments Table
+    await db.execute('''
+      CREATE TABLE teaching_assignments(
+        id TEXT PRIMARY KEY,
+        kelasId TEXT,
+        mapelId TEXT,
+        ustadId TEXT,
         syncStatus INTEGER DEFAULT 0
       )
     ''');
@@ -115,8 +152,11 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 3) {
+    if (oldVersion < 5) {
       // Simple migration: Drop all and recreate for development phase
+      await db.execute('DROP TABLE IF EXISTS aktivitas_kelas');
+      await db.execute('DROP TABLE IF EXISTS kelas');
+      await db.execute('DROP TABLE IF EXISTS teaching_assignments');
       await db.execute('DROP TABLE IF EXISTS santri');
       await db.execute('DROP TABLE IF EXISTS penilaian_tahfidz');
       await db.execute('DROP TABLE IF EXISTS penilaian_mapel');

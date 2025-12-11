@@ -85,7 +85,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                         labelText: 'Peran',
                         icon: Icons.category,
                         child: DropdownButtonFormField<String>(
-                          value: _selectedRole,
+                          initialValue: _selectedRole,
+                          isExpanded: true,
                           decoration: InputDecoration(
                             border: InputBorder.none,
                             contentPadding: EdgeInsets.zero,
@@ -94,9 +95,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                             prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 0),
                           ),
                           items: const [
-                            DropdownMenuItem(value: 'Admin', child: Text('Admin')),
-                            DropdownMenuItem(value: 'Ustadz', child: Text('Ustadz/Wali Kelas')),
-                            DropdownMenuItem(value: 'Wali', child: Text('Wali Santri')),
+                            DropdownMenuItem(value: 'Admin', child: Text('Admin (Request)', overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(value: 'Ustadz', child: Text('Ustadz/Wali Kelas (Request)', overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(value: 'Wali', child: Text('Wali Santri (Default)', overflow: TextOverflow.ellipsis)),
                           ],
                           onChanged: (value) {
                             setState(() {
@@ -111,6 +112,30 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                           },
                         ),
                       ),
+                      if (_selectedRole != 'Wali')
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8, bottom: 8),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    "Jika Anda memilih Admin atau Ustadz, akun Anda akan berstatus 'Wali Santri' sementara hingga disetujui oleh Admin.",
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.orange[800]),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 16),
 
                       // Nama Field
@@ -296,7 +321,7 @@ class _RegisterInputCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 2,
             blurRadius: 5,
             offset: const Offset(0, 3),
@@ -311,7 +336,7 @@ class _RegisterInputCard extends StatelessWidget {
           labelText: labelText,
           border: InputBorder.none,
           contentPadding: EdgeInsets.zero,
-          prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.primary.withOpacity(0.7)),
+          prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7)),
           prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 0),
         ),
         validator: validator,

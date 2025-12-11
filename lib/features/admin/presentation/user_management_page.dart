@@ -130,7 +130,7 @@ class UserManagementPage extends ConsumerWidget {
                   ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
-                  value: selectedRole,
+                  initialValue: selectedRole,
                   decoration: const InputDecoration(
                     labelText: 'Peran',
                     border: OutlineInputBorder(),
@@ -167,7 +167,7 @@ class UserManagementPage extends ConsumerWidget {
                 try {
                   if (isEditing) {
                     await firebaseServices.updateUser(
-                      user!.id,
+                      user.id,
                       nameController.text,
                       emailController.text,
                       selectedRole,

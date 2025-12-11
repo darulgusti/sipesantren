@@ -6,6 +6,7 @@ import 'package:sipesantren/features/admin/presentation/user_management_page.dar
 import 'package:sipesantren/features/auth/presentation/login_page.dart';
 import 'package:sipesantren/features/santri/presentation/santri_list_page.dart';
 import 'package:sipesantren/features/kelas/presentation/kelas_list_page.dart';
+import 'package:sipesantren/features/master_data/presentation/mapel_list_page.dart';
 import 'package:sipesantren/firebase_services.dart';
 
 class DashboardPage extends ConsumerWidget {
@@ -27,7 +28,7 @@ class DashboardPage extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Selamat Datang Admin! $roleMessage',
+              Text('Selamat Datang ${userState.userName}!',
                   style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 20),
               DashboardActionCard(
@@ -37,6 +38,26 @@ class DashboardPage extends ConsumerWidget {
                 onTap: () {
                   Navigator.of(context).push(MaterialPageRoute(
                       builder: (_) => const SantriListPage()));
+                },
+              ),
+              const SizedBox(height: 10),
+              DashboardActionCard(
+                icon: Icons.class_,
+                title: 'Kelola Kelas',
+                subtitle: 'Atur kelas, wali kelas, dan pengajar.',
+                onTap: () {
+                  Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const KelasListPage()));
+                },
+              ),
+              const SizedBox(height: 10),
+              DashboardActionCard(
+                icon: Icons.library_books,
+                title: 'Kelola Mata Pelajaran',
+                subtitle: 'Tambah dan edit mata pelajaran.',
+                onTap: () {
+                  Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => const MapelListPage()));
                 },
               ),
               const SizedBox(height: 10),
@@ -69,7 +90,7 @@ class DashboardPage extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Selamat Datang ${userState.userRole}! $roleMessage',
+              Text('Selamat Datang ${userState.userName}!',
                   style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 20),
               DashboardActionCard(
@@ -110,19 +131,10 @@ class DashboardPage extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Selamat Datang Wali Santri! $roleMessage',
+              Text('Selamat Datang ${userState.userName}!',
                   style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 20),
-              DashboardActionCard(
-                icon: Icons.assignment,
-                title: 'Lihat Rapor',
-                subtitle: 'Akses rapor santri Anda.',
-                onTap: () {
-                   Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => const SantriListPage()));
-                },
-              ),
-              const SizedBox(height: 10),
+
               DashboardActionCard(
                 icon: Icons.person,
                 title: 'Lihat Detail Santri',
