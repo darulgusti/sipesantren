@@ -174,7 +174,133 @@ class DashboardPage extends ConsumerWidget {
           ),
         ],
       ),
-      body: bodyContent,
+      body: Column(
+        children: [
+          if (userState.requestStatus == 'pending')
+            Container(
+              width: double.infinity,
+              color: Colors.amber[100],
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.amber[900]),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      "Permintaan Anda menjadi ${userState.requestedRole} sedang ditinjau. Cek lagi nanti.",
+                      style: TextStyle(color: Colors.amber[900], fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.refresh, color: Colors.amber[900]),
+                    onPressed: () async {
+                      final firebaseServices = ref.read(firebaseServicesProvider);
+                      final updatedUser = await firebaseServices.getUserById(userState.userId!);
+                      
+                      if (updatedUser != null && context.mounted) {
+                        // Update session and provider
+                        await firebaseServices.saveUserSession(
+                          updatedUser.id,
+                          updatedUser.role,
+                          updatedUser.name,
+                          requestedRole: updatedUser.requestedRole,
+                          requestStatus: updatedUser.requestStatus,
+                        );
+                        
+                        ref.read(userProvider.notifier).login(
+                          updatedUser.id,
+                          updatedUser.role,
+                          updatedUser.name,
+                          requestedRole: updatedUser.requestedRole,
+                          requestStatus: updatedUser.requestStatus,
+                        );
+
+                        if (updatedUser.requestStatus == 'pending') {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Status masih menunggu persetujuan.")),
+                          );
+                        }
+                      }
+                    },
+                  )
+                ],
+              ),
+            ),
+          if (userState.requestStatus == 'approved')
+            Container(
+              width: double.infinity,
+              color: Colors.green[100],
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle_outline, color: Colors.green[900]),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      "Permintaan peran Anda telah disetujui.",
+                      style: TextStyle(color: Colors.green[900], fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: Colors.green[900]),
+                    onPressed: () async {
+                      final firebaseServices = ref.read(firebaseServicesProvider);
+                      await firebaseServices.dismissRequestStatus(userState.userId!);
+                      
+                       // Update session and provider to clear the status
+                        await firebaseServices.saveUserSession(
+                          userState.userId!,
+                          userState.userRole!,
+                          userState.userName!,
+                          requestedRole: null,
+                          requestStatus: null,
+                        );
+
+                        ref.read(userProvider.notifier).clearRequestStatus();
+                    },
+                  )
+                ],
+              ),
+            ),
+          if (userState.requestStatus == 'rejected')
+            Container(
+              width: double.infinity,
+              color: Colors.red[100],
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.red[900]),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      "Permintaan Anda menjadi ${userState.requestedRole} ditolak.",
+                      style: TextStyle(color: Colors.red[900], fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: Colors.red[900]),
+                    onPressed: () async {
+                      final firebaseServices = ref.read(firebaseServicesProvider);
+                      await firebaseServices.dismissRequestStatus(userState.userId!);
+                      
+                       // Update session and provider to clear the status
+                        await firebaseServices.saveUserSession(
+                          userState.userId!,
+                          userState.userRole!,
+                          userState.userName!,
+                          requestedRole: null,
+                          requestStatus: null,
+                        );
+
+                        ref.read(userProvider.notifier).clearRequestStatus();
+                    },
+                  )
+                ],
+              ),
+            ),
+          Expanded(child: bodyContent),
+        ],
+      ),
     );
   }
 }

@@ -139,7 +139,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 await db.saveUserSession(
                                   user['id'],
                                   user['role'] ?? 'Ustadz',
-                                  user['name'] ?? 'User'
+                                  user['name'] ?? 'User',
+                                  requestedRole: user['requested_role'],
+                                  requestStatus: user['request_status'],
                                 );
 
                                 if (mounted) {
@@ -147,6 +149,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                     user['id'],
                                     user['role'] ?? 'Ustadz',
                                     user['name'] ?? 'User',
+                                    requestedRole: user['requested_role'],
+                                    requestStatus: user['request_status'],
                                   );
 
                                   setState(() {

@@ -54,6 +54,8 @@ class _MyAppState extends ConsumerState<MyApp> { // Changed to ConsumerState
             session['id']!,
             roleToUse,
             session['name'] ?? 'User',
+            requestedRole: session['requested_role'],
+            requestStatus: session['request_status'],
           );
     }
     ref.read(userProvider.notifier).sessionCheckCompleted(); // Mark session check as complete
